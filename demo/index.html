@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IVSGround - Interactive Demo</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'Helvetica Neue', 'Segoe UI', sans-serif; background: #f5f5f7; color: #333; overflow: hidden; height: 100vh; }
+
+/* Layout */
+.container { display: flex; height: 100vh; }
+/* collapse via width (not negative margin) so the viewer never exceeds the visible area */
+.sidebar { width: 360px; min-width: 360px; background: #fff; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow: hidden; transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s; }
+.sidebar.collapsed { min-width: 0; width: 0; opacity: 0; pointer-events: none; border-right: none; }
+/* min-width:0 + absolute canvas: keep flex layout independent of the canvas
+   inline pixel size, else re-expanding the right panel pushes it off-screen */
+.viewer-area { flex: 1; min-width: 0; position: relative; overflow: hidden; background: #2c2c2e; }
+#canvas3d { position: absolute; inset: 0; }
+.right-panel { width: 380px; min-width: 380px; background: #fff; border-left: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow: hidden; transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s; }
+.right-panel.collapsed { min-width: 0; width: 0; opacity: 0; pointer-events: none; border-left: none; }
+
+/* Header */
+.header { padding: 20px 20px 16px; border-bottom: 1px solid #e0e0e0; }
+.header h1 { font-size: 20px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.3px; }
+.header h1 span { color: #0071e3; }
+.header .subtitle { font-size: 12px; color: #86868b; margin-top: 4px; }
+
+/* Query section */
+.query-section-label { padding: 12px 20px 6px; font-size: 11px; font-weight: 600; color: #86868b; text-transform: uppercase; letter-spacing: 0.5px; }
+.query-list { flex: 1; overflow-y: auto; padding: 4px 12px; }
+.query-item { padding: 10px 12px; margin: 2px 0; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s ease; }
+.query-item:hover { background: #f5f5f7; }
+.query-item.active { background: #e8f0fe; border-color: #0071e3; }
+.query-utterance { font-size: 13px; line-height: 1.45; color: #1d1d1f; font-style: italic; }
+.query-meta { display: flex; gap: 6px; margin-top: 6px; align-items: center; flex-wrap: wrap; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.2px; }
+.tag-improved { background: #fff3e0; color: #e65100; }
+.tag-correct { background: #e8f5e9; color: #2e7d32; }
+.tag-wrong { background: #fce4ec; color: #c62828; }
+.tag-easy { background: #e3f2fd; color: #1565c0; }
+.tag-hard { background: #fce4ec; color: #c62828; }
+.tag-vdep { background: #f3e5f5; color: #7b1fa2; }
+.tag-vindep { background: #e0f2f1; color: #00695c; }
+.tag-cands { background: #f5f5f5; color: #666; }
+
+/* Info panel */
+.info-panel { padding: 14px 20px; background: #fafafa; border-top: 1px solid #e0e0e0; }
+.info-panel h3 { font-size: 11px; font-weight: 600; color: #86868b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.info-row { font-size: 12px; }
+.info-label { color: #86868b; }
+.info-value { color: #1d1d1f; font-weight: 500; }
+
+/* Viewer toolbar */
+.toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); z-index: 10; display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.tbtn { padding: 5px 12px; border-radius: 6px; border: none; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); cursor: pointer; font-size: 11px; font-weight: 500; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: all 0.15s; }
+.tbtn.loading { opacity: 0.45; pointer-events: none; }
+.tbtn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.tbtn.on { background: rgba(0,113,227,0.4); color: #fff; }
+.tslider-group { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 6px; background: rgba(255,255,255,0.12); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.tslider-group label { font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 500; white-space: nowrap; }
+.tslider-group input[type=range] { width: 80px; height: 4px; accent-color: #0071e3; cursor: pointer; }
+
+/* Query banner (top of viewer) */
+.query-banner { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 10px; padding: 8px 20px; max-width: 60%; text-align: center; }
+.query-banner .qtext { font-size: 14px; color: #fff; font-style: italic; }
+.query-banner .qresult { font-size: 11px; margin-top: 4px; }
+.qresult .r-correct { color: #66bb6a; }
+.qresult .r-wrong { color: #ef5350; }
+
+/* Legend */
+.legend { position: absolute; bottom: 12px; left: 12px; z-index: 10; background: rgba(0,0,0,0.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 8px; padding: 10px 14px; }
+.legend-title { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: rgba(255,255,255,0.8); margin: 3px 0; }
+.legend-swatch { width: 14px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.legend-toggle { cursor: pointer; user-select: none; border-radius: 3px; padding: 1px 4px; margin: 0 -4px; transition: opacity 0.15s; }
+.legend-toggle:hover { background: rgba(255,255,255,0.1); }
+.legend-toggle.hidden { opacity: 0.3; text-decoration: line-through; }
+
+/* Reasoning panel */
+.reasoning-overlay { position: absolute; top: 56px; right: 12px; z-index: 10; width: 380px; max-height: 55vh; background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 10px; overflow: hidden; display: none; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+.reasoning-overlay.visible { display: block; }
+.reasoning-tab-bar { display: flex; border-bottom: 1px solid #e0e0e0; }
+.reasoning-tab { flex: 1; padding: 8px 12px; font-size: 11px; font-weight: 600; text-align: center; cursor: pointer; color: #86868b; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.reasoning-tab.active { color: #0071e3; border-bottom-color: #0071e3; }
+.reasoning-tab .tab-badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
+.reasoning-body { padding: 12px 14px; font-size: 11px; line-height: 1.6; overflow-y: auto; max-height: calc(55vh - 40px); white-space: pre-wrap; color: #333; font-family: 'SF Mono', 'Consolas', 'Monaco', monospace; }
+
+/* Loading */
+.loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #2c2c2e; z-index: 100; }
+.loading-spinner { width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.15); border-top-color: #0071e3; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 12px; }
+
+/* Right Panel Header */
+.right-panel-header { padding: 14px 20px 10px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+.right-panel-header h3 { font-size: 13px; font-weight: 700; color: #1d1d1f; }
+.right-panel-hint { font-size: 10.5px; line-height: 1.45; color: #86868b; margin-top: 4px; }
+.right-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gallery-sort { display: flex; align-items: center; gap: 4px; }
+.gsort-label { font-size: 10px; color: #86868b; }
+.gsort-btn { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; cursor: pointer; color: #86868b; background: #f0f0f2; transition: all 0.15s; }
+.gsort-btn:hover { background: #e4e4e7; }
+.gsort-btn.active { background: #0071e3; color: #fff; }
+
+/* Frame Gallery (in right panel) */
+.gallery-tabs { display: flex; gap: 4px; padding: 10px 12px 8px; flex-shrink: 0; overflow-x: auto; flex-wrap: wrap; }
+.gallery-tab { padding: 4px 12px; border-radius: 4px; font-size: 10px; font-weight: 600; cursor: pointer; border: 2px solid transparent; white-space: nowrap; transition: all 0.15s; }
+.gallery-tab:hover { background: #f0f0f0; }
+.gallery-tab.active { border-color: currentColor; background: rgba(0,0,0,0.04); }
+.gallery-grid { flex: 1; overflow-y: auto; padding: 0 12px 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; align-content: start; grid-auto-rows: min-content; }
+.gallery-item { position: relative; border-radius: 6px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s, box-shadow 0.15s; min-height: 100px; }
+.gallery-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.2); transform: scale(1.02); }
+.gallery-item.top3 { border-color: #4caf50; border-width: 4px; box-shadow: 0 0 8px rgba(76,175,80,0.6); }
+.gallery-item.highlighted { border-color: #ffd600; border-width: 4px; box-shadow: 0 0 10px rgba(255,214,0,0.7); }
+.gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery-item .frame-rank { position: absolute; top: 3px; left: 3px; background: rgba(0,0,0,0.65); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+.gallery-item .frame-score { position: absolute; bottom: 3px; right: 3px; background: rgba(0,0,0,0.65); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+.gallery-item .frame-id { position: absolute; bottom: 3px; left: 3px; background: rgba(0,0,0,0.65); color: rgba(255,255,255,0.7); font-size: 9px; padding: 2px 5px; border-radius: 3px; }
+.gallery-item .bbox-overlay { position: absolute; border: 3px solid; border-radius: 2px; pointer-events: none; box-shadow: 0 0 4px rgba(255,255,255,0.5); }
+.gallery-grid::-webkit-scrollbar { width: 4px; }
+.gallery-grid::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+.gallery-empty { padding: 20px; text-align: center; color: #86868b; font-size: 12px; }
+
+/* Lightbox */
+/* Instant tooltip (native title tooltips are slow) */
+.tip-pop { position: fixed; z-index: 2000; background: rgba(20,20,24,0.95); color: #fff; font-size: 11px; line-height: 1.5; padding: 6px 10px; border-radius: 6px; max-width: 220px; pointer-events: none; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+
+/* Narrow-screen notice (demo is desktop-first) */
+.mobile-notice { position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; padding: 24px; }
+.mobile-notice.visible { display: flex; }
+.mobile-notice-card { background: #fff; border-radius: 14px; padding: 26px 24px; max-width: 420px; text-align: center; }
+.mobile-notice-card h3 { font-size: 16px; color: #1d1d1f; margin-bottom: 10px; }
+.mobile-notice-card p { font-size: 13px; line-height: 1.6; color: #6e6e73; margin-bottom: 18px; }
+.mobile-notice-card button { background: #0071e3; color: #fff; border: none; border-radius: 999px; padding: 10px 26px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+.lightbox { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+.lightbox.visible { display: flex; }
+.lightbox-img-wrap { position: relative; display: inline-block; cursor: default; }
+.lightbox img { max-width: 50vw; max-height: 50vh; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); object-fit: contain; transition: opacity 0.1s; display: block; }
+.lightbox .bbox-overlay { position: absolute; border: 4px solid; border-radius: 3px; pointer-events: none; box-shadow: 0 0 6px rgba(255,255,255,0.5); }
+.lightbox-info { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border-radius: 8px; padding: 8px 16px; color: #fff; font-size: 12px; text-align: center; }
+.lightbox-info .lb-rank { font-weight: 700; color: #66bb6a; }
+.lightbox-info .lb-score { color: #90caf9; }
+.lightbox-close { position: absolute; top: 16px; right: 20px; color: #fff; font-size: 28px; cursor: pointer; opacity: 0.7; transition: opacity 0.15s; background: none; border: none; }
+.lightbox-close:hover { opacity: 1; }
+
+/* Scrollbar */
+.query-list::-webkit-scrollbar, .reasoning-body::-webkit-scrollbar { width: 6px; }
+.query-list::-webkit-scrollbar-thumb, .reasoning-body::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+.query-list::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="sidebar">
+    <div class="header">
+      <h1><span>IVS</span>Ground</h1>
+      <div class="subtitle">Influential View Selection for 3D Visual Grounding</div>
+      <div style="margin-top:6px;"><a href="../" style="font-size:12px;color:#0071e3;text-decoration:none;">&larr; Back to project page</a></div>
+    </div>
+    <div class="query-section-label">Scene</div>
+    <div style="padding: 4px 12px;">
+      <select id="sceneSelector" style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid #d0d0d0;background:#fafafa;font-size:13px;color:#333;cursor:pointer;" onchange="onSceneChange(this.value)">
+      </select>
+    </div>
+    <div class="query-section-label">Queries</div>
+    <div class="query-list" id="queryList"></div>
+    <div class="info-panel" id="infoPanel">
+      <h3>Scene</h3>
+      <div class="info-grid">
+        <div class="info-row"><span class="info-label">ID</span></div>
+        <div class="info-row"><span class="info-value" id="infoScene">--</span></div>
+        <div class="info-row"><span class="info-label">Points</span></div>
+        <div class="info-row"><span class="info-value" id="infoPoints">--</span></div>
+        <div class="info-row"><span class="info-label">Candidates</span></div>
+        <div class="info-row"><span class="info-value" id="infoCandidates">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="viewer-area" id="viewer">
+    <div class="loading" id="loading">
+      <div style="text-align:center;">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading scene...</div>
+      </div>
+    </div>
+
+    <div class="query-banner" id="queryBanner" style="display:none;">
+      <div class="qtext" id="bannerText"></div>
+      <div class="qresult" id="bannerResult"></div>
+    </div>
+
+    <div class="toolbar" id="toolbar">
+      <button class="tbtn on" id="btnFrustums" onclick="toggle('frustums')">Frustums</button>
+      <button class="tbtn" id="btnTrajectory" onclick="toggle('trajectory')">Trajectory</button>
+      <button class="tbtn" id="btnHighlight" onclick="toggle('highlight')">Highlight</button>
+      <button class="tbtn on" id="btnBBox" onclick="toggle('bbox')">BBox</button>
+      <button class="tbtn" id="btnReasoning" onclick="toggle('reasoning')">Reasoning</button>
+      <button class="tbtn" onclick="setView('top')">Top</button>
+      <button class="tbtn" onclick="setView('oblique')">3/4 View</button>
+      <button class="tbtn" id="btnEDL" onclick="toggle('edl')">EDL</button>
+      <div class="tslider-group">
+        <label>Size</label>
+        <input type="range" id="ptSizeSlider" min="0.5" max="6.0" step="0.1" value="1.4" oninput="onPointSizeChange(this.value)">
+      </div>
+      <button class="tbtn" onclick="resetView()">Reset</button>
+      <button class="tbtn on" id="btnMesh" onclick="toggle('mesh')">Mesh</button>
+      <button class="tbtn on" id="btnSidebar" onclick="togglePanel('sidebar')">Sidebar</button>
+      <button class="tbtn on" id="btnGallery" onclick="togglePanel('gallery')">Gallery</button>
+    </div>
+
+    <div class="legend" id="legend"></div>
+
+    <div class="reasoning-overlay" id="reasoningPanel">
+      <div class="reasoning-tab-bar">
+        <div class="reasoning-tab active" id="tabIVS" onclick="showReasoningTab('ivs')">IVS <span class="tab-badge" id="tabIVSBadge"></span></div>
+        <div class="reasoning-tab" id="tabBase" onclick="showReasoningTab('base')">Baseline <span class="tab-badge" id="tabBaseBadge"></span></div>
+      </div>
+      <div class="reasoning-body" id="reasoningBody"></div>
+    </div>
+
+    <canvas id="canvas3d"></canvas>
+  </div>
+
+  <div class="right-panel" id="rightPanel">
+    <div class="right-panel-header">
+      <div class="right-panel-title-row">
+        <h3>Frame Gallery</h3>
+        <div class="gallery-sort" id="gallerySort" style="display:none;">
+          <span class="gsort-label">Sort:</span><span class="gsort-btn active" data-s="ivs" onclick="setGallerySort('ivs')">IVS</span><span class="gsort-btn" data-s="vis" onclick="setGallerySort('vis')">Visibility</span>
+        </div>
+      </div>
+      <div class="right-panel-hint" id="galleryHint">Views of the selected candidate, ranked by the learned view selector's score (bottom-right of each thumbnail). Green border = top-3 views given to the VLM.</div>
+    </div>
+    <div class="gallery-tabs" id="galleryTabs"></div>
+    <div class="gallery-grid" id="galleryGrid"></div>
+  </div>
+</div>
+
+<div class="tip-pop" id="tipPop"></div>
+
+<div class="mobile-notice" id="mobileNotice">
+  <div class="mobile-notice-card">
+    <h3>Best viewed on desktop</h3>
+    <p>This interactive 3D demo is designed for desktop browsers. On a small screen the panels and toolbar may be cramped, but you can still explore the scenes.</p>
+    <button onclick="document.getElementById('mobileNotice').classList.remove('visible')">Continue anyway</button>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+  <div class="lightbox-img-wrap" id="lightboxWrap" onclick="event.stopPropagation()">
+    <img id="lightboxImg" src="" alt="">
+  </div>
+  <div class="lightbox-info" id="lightboxInfo"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+
+// ===================== State =====================
+let scene3d, camera, renderer, controls;
+let pointCloud = null, sceneMesh = null, originalColors = null, sceneData = null, currentQuery = null;
+let frustumGroup = new THREE.Group();
+let trajectoryLine = null;
+let showFrustums = true, showTrajectory = false, showHighlight = false, showEDL = false, showBBox = true;
+let meshMode = true;
+// Preload cache: sceneId -> { geometry, meshGeometry, data }
+const sceneCache = {};
+let currentReasoningTab = 'ivs';
+let rtColor = null, edlMaterial = null, postScene = null, postCamera = null;
+let discTexture = null;
+let basePtSize = 0, ptSizeMultiplier = 1.4;
+let bboxGroup = new THREE.Group();
+let frustumHitMeshes = [];
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let lastHoveredFid = null;
+
+const GT_COLOR = new THREE.Color(0x2e7d32);
+const DIST_COLORS = [
+    new THREE.Color(0xd32f2f), new THREE.Color(0x1565c0),
+    new THREE.Color(0xef6c00), new THREE.Color(0x7b1fa2),
+    new THREE.Color(0x00838f), new THREE.Color(0xf9a825),
+    new THREE.Color(0xc62828), new THREE.Color(0x546e7a),
+];
+
+// ===================== Disc Texture =====================
+function createDiscTexture() {
+    const sz = 128;
+    const cvs = document.createElement('canvas');
+    cvs.width = cvs.height = sz;
+    const ctx = cvs.getContext('2d');
+    const half = sz / 2;
+    const grad = ctx.createRadialGradient(half, half, 0, half, half, half);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.65, 'rgba(255,255,255,1)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, sz, sz);
+    return new THREE.CanvasTexture(cvs);
+}
+
+// ===================== Init =====================
+function init() {
+    document.getElementById('ptSizeSlider').disabled = meshMode;
+    const canvas = document.getElementById('canvas3d');
+    const container = document.getElementById('viewer');
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setClearColor(0x2c2c2e);
+
+    scene3d = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.05, 200);
+    camera.position.set(5, 5, 5);
+    camera.up.set(0, 0, 1);  // Z-up for ScanNet
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.12;
+    controls.rotateSpeed = 0.7;
+    controls.screenSpacePanning = true;  // pan parallel to screen
+    controls.maxPolarAngle = Math.PI;    // allow full vertical orbit
+
+    // Disc texture for circular points
+    discTexture = createDiscTexture();
+
+    // EDL post-processing
+    const pw = container.clientWidth * renderer.getPixelRatio();
+    const ph = container.clientHeight * renderer.getPixelRatio();
+    rtColor = new THREE.WebGLRenderTarget(pw, ph);
+    rtColor.depthTexture = new THREE.DepthTexture(pw, ph);
+    rtColor.depthTexture.type = THREE.UnsignedIntType;
+
+    edlMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            tDiffuse: { value: null },
+            tDepth: { value: null },
+            resolution: { value: new THREE.Vector2(pw, ph) },
+            edlStrength: { value: 0.05 },
+            edlRadius: { value: 1.5 },
+            cameraNear: { value: 0.05 },
+            cameraFar: { value: 200 },
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D tDiffuse;
+            uniform sampler2D tDepth;
+            uniform vec2 resolution;
+            uniform float edlStrength;
+            uniform float edlRadius;
+            uniform float cameraNear;
+            uniform float cameraFar;
+            varying vec2 vUv;
+
+            float linearDepth(vec2 uv) {
+                float d = texture2D(tDepth, uv).r;
+                if (d >= 1.0) return cameraFar;
+                return cameraNear * cameraFar / (cameraFar - d * (cameraFar - cameraNear));
+            }
+
+            void main() {
+                vec4 color = texture2D(tDiffuse, vUv);
+                float rawD = texture2D(tDepth, vUv).r;
+
+                if (rawD < 1.0) {
+                    float ld = log2(linearDepth(vUv));
+                    float response = 0.0;
+                    for (int i = 0; i < 8; i++) {
+                        float a = float(i) * 0.785398;
+                        vec2 off = vec2(cos(a), sin(a)) * edlRadius / resolution;
+                        float nd = linearDepth(vUv + off);
+                        if (nd < cameraFar) {
+                            response += max(0.0, ld - log2(nd));
+                        }
+                    }
+                    color.rgb *= exp(-response * edlStrength);
+                }
+
+                gl_FragColor = color;
+            }
+        `,
+        depthWrite: false,
+        depthTest: false,
+    });
+
+    postScene = new THREE.Scene();
+    postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), edlMaterial));
+    postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    scene3d.add(new THREE.AmbientLight(0xffffff, 1.0));
+    scene3d.add(frustumGroup);
+    scene3d.add(bboxGroup);
+
+    window.addEventListener('resize', onResize);
+    renderer.domElement.addEventListener('mousemove', onCanvasMouseMove);
+    renderer.domElement.addEventListener('mouseleave', onCanvasMouseLeave);
+    animate();
+}
+
+function animateViewportResize(duration = 320) {
+    const start = performance.now();
+    function step(now) {
+        onResize();
+        if (now - start < duration) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+function onResize() {
+    const c = document.getElementById('viewer');
+    camera.aspect = c.clientWidth / c.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(c.clientWidth, c.clientHeight);
+    if (rtColor) {
+        const rw = c.clientWidth * renderer.getPixelRatio();
+        const rh = c.clientHeight * renderer.getPixelRatio();
+        rtColor.setSize(rw, rh);
+        edlMaterial.uniforms.resolution.value.set(rw, rh);
+    }
+    // Update LineMaterial resolution for fat lines (bbox + frustums)
+    const updateRes = (obj) => {
+        if (obj.material && obj.material.resolution) obj.material.resolution.set(c.clientWidth, c.clientHeight);
+        if (obj.children) obj.children.forEach(updateRes);
+    };
+    bboxGroup.children.forEach(updateRes);
+    frustumGroup.children.forEach(updateRes);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    if (showEDL && rtColor) {
+        renderer.setRenderTarget(rtColor);
+        renderer.render(scene3d, camera);
+        renderer.setRenderTarget(null);
+        edlMaterial.uniforms.tDiffuse.value = rtColor.texture;
+        edlMaterial.uniforms.tDepth.value = rtColor.depthTexture;
+        edlMaterial.uniforms.cameraNear.value = camera.near;
+        edlMaterial.uniforms.cameraFar.value = camera.far;
+        renderer.render(postScene, postCamera);
+    } else {
+        renderer.render(scene3d, camera);
+    }
+}
+
+// ===================== Load =====================
+async function fetchSceneAssets(sceneId) {
+    if (sceneCache[sceneId]) return sceneCache[sceneId];
+    const plyLoader = new PLYLoader();
+    // Blocking: only points + metadata (~3MB). The mesh (~11MB) dominates
+    // load time, so it downloads in the background after these finish.
+    const [geometry, data] = await Promise.all([
+        new Promise((resolve, reject) =>
+            plyLoader.load(`data/${sceneId}.ply`, resolve, undefined, reject)),
+        fetch(`data/${sceneId}.json`).then(r => r.json()),
+    ]);
+    const entry = { geometry, data, meshGeometry: null };
+    entry.meshPromise = new Promise((resolve) =>
+        plyLoader.load(`data/${sceneId}_mesh.ply`, resolve, undefined, () => resolve(null)));
+    sceneCache[sceneId] = entry;
+    return entry;
+}
+
+function preloadScenes(scenes) {
+    // Stagger preloading (0.8s apart) to avoid saturating bandwidth
+    scenes.forEach((sceneId, i) => {
+        if (!sceneCache[sceneId]) {
+            setTimeout(() => fetchSceneAssets(sceneId), 500 + i * 800);
+        }
+    });
+}
+
+async function loadScene(sceneId) {
+    document.getElementById('loading').style.display = 'flex';
+
+    const entry = await fetchSceneAssets(sceneId);
+    const { geometry, data } = entry;
+    sceneData = data;
+
+    if (pointCloud) scene3d.remove(pointCloud);
+    if (sceneMesh) scene3d.remove(sceneMesh);
+
+    // Adaptive point size: smaller for denser clouds
+    const nPts = geometry.attributes.position.count;
+    geometry.computeBoundingBox();
+    const center = new THREE.Vector3(), size = new THREE.Vector3();
+    geometry.boundingBox.getCenter(center);
+    geometry.boundingBox.getSize(size);
+    const volume = size.x * size.y * size.z;
+    const density = nPts / Math.max(volume, 0.01);
+    // ~0.015 for 300K pts in 50m3, ~0.025 for 80K in 50m3
+    basePtSize = Math.max(0.01, Math.min(0.05, 1.8 / Math.pow(density, 0.33)));
+
+    pointCloud = new THREE.Points(geometry, new THREE.PointsMaterial({
+        size: basePtSize * ptSizeMultiplier, vertexColors: true, sizeAttenuation: true,
+        map: discTexture, alphaTest: 0.2,
+    }));
+    originalColors = new Float32Array(geometry.attributes.color.array);
+
+    // Points show immediately; the mesh attaches when its background
+    // download finishes (switching automatically if mesh mode is on)
+    sceneMesh = null;
+    pointCloud.visible = true;
+    scene3d.add(pointCloud);
+    const btnMesh = document.getElementById('btnMesh');
+    const attachMesh = (mg) => {
+        btnMesh.classList.remove('loading');
+        if (!mg) return;
+        sceneMesh = new THREE.Mesh(mg, new THREE.MeshBasicMaterial({
+            vertexColors: true, side: THREE.DoubleSide,
+        }));
+        sceneMesh.visible = meshMode;
+        pointCloud.visible = !meshMode;
+        scene3d.add(sceneMesh);
+    };
+    if (entry.meshGeometry) {
+        attachMesh(entry.meshGeometry);
+    } else {
+        btnMesh.classList.add('loading');
+        entry.meshPromise.then(mg => {
+            entry.meshGeometry = mg;
+            if (sceneData !== data) return;  // user already switched scene
+            attachMesh(mg);
+        });
+    }
+
+    buildTrajectory();
+
+    const d = Math.max(size.x, size.y, size.z);
+    controls.target.copy(center);
+    camera.position.set(center.x + d * 0.7, center.y - d * 0.5, center.z + d * 1.0);
+    camera.up.set(0, 0, 1);
+    controls.update();
+
+    document.getElementById('infoScene').textContent = sceneId;
+    document.getElementById('infoPoints').textContent = sceneData.n_points.toLocaleString();
+    document.getElementById('sceneSelector').value = sceneId;
+
+    populateQueryList();
+    document.getElementById('loading').style.display = 'none';
+
+    if (sceneData.queries.length > 0) selectQuery(0);
+}
+
+function buildTrajectory() {
+    if (trajectoryLine) scene3d.remove(trajectoryLine);
+    const traj = sceneData.trajectory;
+    if (!traj) return;
+    const pts = Object.entries(traj).sort((a,b) => +a[0] - +b[0])
+        .map(([, p]) => new THREE.Vector3(p[0], p[1], p[2]));
+    if (pts.length < 2) return;
+    trajectoryLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.25 })
+    );
+    trajectoryLine.visible = showTrajectory;
+    scene3d.add(trajectoryLine);
+}
+
+// ===================== Query List =====================
+function populateQueryList() {
+    const list = document.getElementById('queryList');
+    list.innerHTML = '';
+    sceneData.queries.forEach((q, i) => {
+        const improved = q.ivs_correct && !q.base_correct;
+        const div = document.createElement('div');
+        div.className = 'query-item';
+
+        let tags = '';
+        tags += q.is_easy ? '<span class="tag tag-easy">Easy</span>' : '<span class="tag tag-hard">Hard</span>';
+        tags += q.is_view_dep ? '<span class="tag tag-vdep">V-Dep</span>' : '<span class="tag tag-vindep">V-Indep</span>';
+        tags += `<span class="tag tag-cands">${q.candidates.length} cands</span>`;
+
+        div.innerHTML = `<div class="query-utterance">"${q.utterance}"</div><div class="query-meta">${tags}</div>`;
+        div.addEventListener('click', () => selectQuery(i));
+        list.appendChild(div);
+    });
+}
+
+function selectQuery(idx) {
+    currentQuery = sceneData.queries[idx];
+    document.querySelectorAll('.query-item').forEach((el, i) => el.classList.toggle('active', i === idx));
+
+    document.getElementById('infoCandidates').textContent = currentQuery.candidates.length;
+
+    // Banner
+    const banner = document.getElementById('queryBanner');
+    banner.style.display = 'block';
+    document.getElementById('bannerText').textContent = `"${currentQuery.utterance}"`;
+    const gtLabel = currentQuery.gt_class ? ` ${currentQuery.gt_class}` : '';
+    document.getElementById('bannerResult').innerHTML =
+        `<span class="r-correct">IVS: #${currentQuery.ivs_predicted}</span> &nbsp;|&nbsp; GT: #${currentQuery.gt_mask_id}${gtLabel}`;
+
+    highlightCandidates();
+    buildFrustums();
+    buildFrustumHitMeshes();
+    buildBBoxes();
+    updateReasoning();
+    updateLegend();
+    updateGallery();
+
+    // Default: hide non-GT candidates (cleaner for recording)
+    currentQuery.candidates.forEach((cand, ci) => {
+        if (!cand.is_gt) toggleCandidate(ci);
+    });
+}
+
+// ===================== Highlight =====================
+function highlightCandidates() {
+    if (!pointCloud || !currentQuery) return;
+    const ca = pointCloud.geometry.attributes.color.array;
+
+    if (!showHighlight) { ca.set(originalColors); pointCloud.geometry.attributes.color.needsUpdate = true; return; }
+
+    // Dim all
+    for (let i = 0; i < originalColors.length; i += 3) {
+        ca[i]   = originalColors[i]   * 0.3 + 0.15 * 0.7;
+        ca[i+1] = originalColors[i+1] * 0.3 + 0.15 * 0.7;
+        ca[i+2] = originalColors[i+2] * 0.3 + 0.15 * 0.7;
+    }
+
+    let dIdx = 0;
+    currentQuery.candidates.forEach(cand => {
+        const c = cand.is_gt ? GT_COLOR : DIST_COLORS[dIdx++ % DIST_COLORS.length];
+        cand.vertex_indices.forEach(vi => {
+            const j = vi * 3;
+            if (j + 2 < ca.length) {
+                ca[j]   = Math.min(1, originalColors[j]   * 0.4 + c.r * 0.6);
+                ca[j+1] = Math.min(1, originalColors[j+1] * 0.4 + c.g * 0.6);
+                ca[j+2] = Math.min(1, originalColors[j+2] * 0.4 + c.b * 0.6);
+            }
+        });
+    });
+    pointCloud.geometry.attributes.color.needsUpdate = true;
+}
+
+// ===================== Frustums =====================
+function computeFrustumParts(pm, depth) {
+    const m4 = new THREE.Matrix4().set(
+        pm[0][0], pm[0][1], pm[0][2], pm[0][3],
+        pm[1][0], pm[1][1], pm[1][2], pm[1][3],
+        pm[2][0], pm[2][1], pm[2][2], pm[2][3],
+        pm[3][0], pm[3][1], pm[3][2], pm[3][3],
+    );
+    const cam = new THREE.Vector3().setFromMatrixPosition(m4);
+    const hw = depth * 0.5, hh = depth * 0.375;
+    const rot = new THREE.Matrix4().extractRotation(m4);
+    const corners = [[-hw,-hh,depth],[hw,-hh,depth],[hw,hh,depth],[-hw,hh,depth]]
+        .map(([x,y,z]) => new THREE.Vector3(x,y,z).applyMatrix4(rot).add(cam));
+    // Edge positions (flat for LineSegmentsGeometry)
+    const edgePos = [];
+    corners.forEach(c => { edgePos.push(cam.x, cam.y, cam.z, c.x, c.y, c.z); });
+    for (let i = 0; i < 4; i++) {
+        edgePos.push(corners[i].x, corners[i].y, corners[i].z,
+                     corners[(i+1)%4].x, corners[(i+1)%4].y, corners[(i+1)%4].z);
+    }
+    // Fill vertices (two triangles)
+    const fillVerts = [
+        ...corners[0].toArray(), ...corners[1].toArray(), ...corners[2].toArray(),
+        ...corners[0].toArray(), ...corners[2].toArray(), ...corners[3].toArray(),
+    ];
+    return { edgePos, fillVerts };
+}
+
+function addBatchedFrustums(group, allEdgePos, allFillVerts, color, linewidth, edgeOpacity, fillOpacity) {
+    if (!allEdgePos.length) return;
+    const container = document.getElementById('viewer');
+    const geo = new LineSegmentsGeometry();
+    geo.setPositions(allEdgePos);
+    group.add(new LineSegments2(geo, new LineMaterial({
+        color, linewidth,
+        resolution: new THREE.Vector2(container.clientWidth, container.clientHeight),
+        transparent: true, opacity: edgeOpacity,
+    })));
+    if (allFillVerts.length) {
+        const fg = new THREE.BufferGeometry();
+        fg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(allFillVerts), 3));
+        group.add(new THREE.Mesh(fg, new THREE.MeshBasicMaterial({
+            color, transparent: true, opacity: fillOpacity, side: THREE.DoubleSide, depthWrite: false,
+        })));
+    }
+}
+
+function buildFrustums() {
+    while (frustumGroup.children.length) {
+        const ch = frustumGroup.children[0];
+        frustumGroup.remove(ch);
+        if (ch.isGroup) ch.children.forEach(c => { c.geometry?.dispose(); c.material?.dispose(); });
+        ch.geometry?.dispose();
+        ch.material?.dispose();
+    }
+    if (!currentQuery || !sceneData.poses) return;
+
+    let dIdx = 0;
+    currentQuery.candidates.forEach((cand, ci) => {
+        const scores = cand.frame_scores;
+        if (!scores) return;
+        const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+        const topSet = new Set(sorted.slice(0, 3).map(([f]) => f));
+        const candGroup = new THREE.Group();
+        candGroup.userData.candIdx = ci;
+
+        if (cand.is_gt) {
+            const greenE = [], greenF = [], greyE = [], greyF = [];
+            sorted.forEach(([fid]) => {
+                const p = sceneData.poses[fid];
+                if (!p) return;
+                const isTop = topSet.has(fid);
+                const { edgePos, fillVerts } = computeFrustumParts(p, isTop ? 0.35 : 0.25);
+                (isTop ? greenE : greyE).push(...edgePos);
+                (isTop ? greenF : greyF).push(...fillVerts);
+            });
+            addBatchedFrustums(candGroup, greenE, greenF, 0x2e7d32, 3, 0.85, 0.12);
+            addBatchedFrustums(candGroup, greyE, greyF, 0x888888, 2, 0.4, 0.05);
+        } else {
+            const candColor = DIST_COLORS[dIdx++ % DIST_COLORS.length].getHex();
+            const edges = [], fills = [];
+            sorted.slice(0, 3).forEach(([fid]) => {
+                const p = sceneData.poses[fid];
+                if (!p) return;
+                const { edgePos, fillVerts } = computeFrustumParts(p, 0.3);
+                edges.push(...edgePos);
+                fills.push(...fillVerts);
+            });
+            addBatchedFrustums(candGroup, edges, fills, candColor, 2.5, 0.7, 0.08);
+        }
+
+        frustumGroup.add(candGroup);
+    });
+    frustumGroup.visible = showFrustums;
+}
+
+// ===================== BBoxes =====================
+function buildBBoxes() {
+    while (bboxGroup.children.length) {
+        const ch = bboxGroup.children[0];
+        bboxGroup.remove(ch);
+        ch.geometry?.dispose();
+        ch.material?.dispose();
+    }
+    if (!currentQuery) return;
+
+    const container = document.getElementById('viewer');
+    let dIdx = 0;
+    currentQuery.candidates.forEach((cand, ci) => {
+        const bb = cand.bbox;
+        if (!bb) return;
+        const color = cand.is_gt ? 0x2e7d32 : DIST_COLORS[dIdx++ % DIST_COLORS.length].getHex();
+        const mn = bb.min, mx = bb.max;
+        // 8 corners
+        const c = [
+            mn[0],mn[1],mn[2], mx[0],mn[1],mn[2], mx[0],mx[1],mn[2], mn[0],mx[1],mn[2],
+            mn[0],mn[1],mx[2], mx[0],mn[1],mx[2], mx[0],mx[1],mx[2], mn[0],mx[1],mx[2],
+        ];
+        // 12 edges as pairs of indices
+        const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+        const positions = [];
+        edges.forEach(([a,b]) => {
+            positions.push(c[a*3], c[a*3+1], c[a*3+2], c[b*3], c[b*3+1], c[b*3+2]);
+        });
+        const geo = new LineSegmentsGeometry();
+        geo.setPositions(positions);
+        const mat = new LineMaterial({
+            color, linewidth: 3, // pixels
+            resolution: new THREE.Vector2(container.clientWidth, container.clientHeight),
+            transparent: true, opacity: 0.85,
+        });
+        const obj = new LineSegments2(geo, mat);
+        obj.userData.candIdx = ci;
+        bboxGroup.add(obj);
+    });
+    bboxGroup.visible = showBBox;
+}
+
+// ===================== Per-Candidate Toggle =====================
+window.toggleCandidate = function(ci) {
+    // Toggle frustum subgroup
+    frustumGroup.children.forEach(ch => {
+        if (ch.userData.candIdx === ci) ch.visible = !ch.visible;
+    });
+    // Toggle bbox
+    bboxGroup.children.forEach(ch => {
+        if (ch.userData.candIdx === ci) ch.visible = !ch.visible;
+    });
+    // Toggle hit meshes for reverse hover
+    frustumHitMeshes.forEach(m => {
+        if (m.userData.candIdx === ci) m.userData.disabled = !m.userData.disabled;
+    });
+    // Update legend visual
+    const el = document.querySelector(`.legend-toggle[data-ci="${ci}"]`);
+    if (el) el.classList.toggle('hidden');
+};
+
+// ===================== Controls =====================
+window.onPointSizeChange = function(val) {
+    ptSizeMultiplier = parseFloat(val);
+    if (pointCloud && basePtSize > 0) {
+        pointCloud.material.size = basePtSize * ptSizeMultiplier;
+    }
+};
+
+window.toggle = function(what) {
+    if (what === 'frustums') { showFrustums = !showFrustums; frustumGroup.visible = showFrustums; document.getElementById('btnFrustums').classList.toggle('on', showFrustums); }
+    if (what === 'trajectory') { showTrajectory = !showTrajectory; if (trajectoryLine) trajectoryLine.visible = showTrajectory; document.getElementById('btnTrajectory').classList.toggle('on', showTrajectory); }
+    if (what === 'highlight') { showHighlight = !showHighlight; document.getElementById('btnHighlight').classList.toggle('on', showHighlight); highlightCandidates(); }
+    if (what === 'bbox') { showBBox = !showBBox; bboxGroup.visible = showBBox; document.getElementById('btnBBox').classList.toggle('on', showBBox); }
+    if (what === 'edl') { showEDL = !showEDL; document.getElementById('btnEDL').classList.toggle('on', showEDL); }
+    if (what === 'reasoning') { const p = document.getElementById('reasoningPanel'); p.classList.toggle('visible'); document.getElementById('btnReasoning').classList.toggle('on', p.classList.contains('visible')); }
+    if (what === 'mesh') {
+        meshMode = !meshMode;
+        document.getElementById('btnMesh').classList.toggle('on', meshMode);
+        if (pointCloud) pointCloud.visible = !meshMode;
+        if (sceneMesh) sceneMesh.visible = meshMode;
+        // Size slider only meaningful for points
+        document.getElementById('ptSizeSlider').disabled = meshMode;
+    }
+};
+
+window.togglePanel = function(panel) {
+    if (panel === 'sidebar') {
+        const sb = document.querySelector('.sidebar');
+        sb.classList.toggle('collapsed');
+        document.getElementById('btnSidebar').classList.toggle('on', !sb.classList.contains('collapsed'));
+    } else if (panel === 'gallery') {
+        const rp = document.getElementById('rightPanel');
+        rp.classList.toggle('collapsed');
+        document.getElementById('btnGallery').classList.toggle('on', !rp.classList.contains('collapsed'));
+    }
+    // Resize the 3D viewport every frame during the panel transition,
+    // otherwise the stretched old frame visibly warps then snaps back
+    animateViewportResize();
+};
+
+window.setView = function(v) {
+    if (!pointCloud) return;
+    const center = new THREE.Vector3(), size = new THREE.Vector3();
+    pointCloud.geometry.boundingBox.getCenter(center);
+    pointCloud.geometry.boundingBox.getSize(size);
+    const d = Math.max(size.x, size.y, size.z);
+    controls.target.copy(center);
+    if (v === 'top') {
+        camera.position.set(center.x, center.y, center.z + d * 1.5);
+        camera.up.set(0, 1, 0);
+    } else {
+        camera.position.set(center.x + d * 0.7, center.y - d * 0.5, center.z + d * 1.0);
+        camera.up.set(0, 0, 1);
+    }
+    controls.update();
+};
+
+window.resetView = function() {
+    // Reset toggles to defaults
+    showFrustums = true; showTrajectory = false; showHighlight = false; showBBox = true; showEDL = false;
+    frustumGroup.visible = true; if (trajectoryLine) trajectoryLine.visible = false; bboxGroup.visible = true;
+    document.getElementById('btnFrustums').classList.add('on');
+    document.getElementById('btnTrajectory').classList.remove('on');
+    document.getElementById('btnHighlight').classList.remove('on');
+    document.getElementById('btnBBox').classList.add('on');
+    document.getElementById('btnEDL').classList.remove('on');
+    // Close reasoning panel, restore panels
+    document.getElementById('reasoningPanel').classList.remove('visible');
+    document.getElementById('btnReasoning').classList.remove('on');
+    document.querySelector('.sidebar').classList.remove('collapsed');
+    document.getElementById('rightPanel').classList.remove('collapsed');
+    document.getElementById('btnSidebar').classList.add('on');
+    document.getElementById('btnGallery').classList.add('on');
+    // Reset point size
+    ptSizeMultiplier = 1.4;
+    document.getElementById('ptSizeSlider').value = '1.4';
+    if (pointCloud && basePtSize > 0) pointCloud.material.size = basePtSize * ptSizeMultiplier;
+    // Reset camera to 3/4 view
+    if (pointCloud) {
+        const center = new THREE.Vector3(), size = new THREE.Vector3();
+        pointCloud.geometry.boundingBox.getCenter(center);
+        pointCloud.geometry.boundingBox.getSize(size);
+        const d = Math.max(size.x, size.y, size.z);
+        controls.target.copy(center);
+        camera.position.set(center.x + d * 0.7, center.y - d * 0.5, center.z + d * 1.0);
+        camera.up.set(0, 0, 1);
+        controls.update();
+    }
+    highlightCandidates();
+};
+
+window.showReasoningTab = function(tab) {
+    currentReasoningTab = tab;
+    document.getElementById('tabIVS').classList.toggle('active', tab === 'ivs');
+    document.getElementById('tabBase').classList.toggle('active', tab === 'base');
+    updateReasoningContent();
+};
+
+function updateReasoning() {
+    if (!currentQuery) return;
+    document.getElementById('tabIVSBadge').textContent = '';
+    document.getElementById('tabBaseBadge').textContent = '';
+    updateReasoningContent();
+}
+
+function updateReasoningContent() {
+    if (!currentQuery) return;
+    const body = document.getElementById('reasoningBody');
+    body.textContent = currentReasoningTab === 'ivs'
+        ? (currentQuery.ivs_reasoning || '(no reasoning available)')
+        : (currentQuery.base_reasoning || '(no reasoning available)');
+}
+
+function updateLegend() {
+    if (!currentQuery) return;
+    let html = '<div class="legend-title">Candidates (click to toggle)</div>';
+    const gtClass = currentQuery.gt_class ? ` (${currentQuery.gt_class})` : '';
+    let di = 0;
+    currentQuery.candidates.forEach((c, ci) => {
+        if (c.is_gt) {
+            html += `<div class="legend-item legend-toggle" data-ci="${ci}" onclick="toggleCandidate(${ci})"><div class="legend-swatch" style="background:#2e7d32;"></div> #${c.mask_id}${gtClass} - GT</div>`;
+        } else {
+            const col = DIST_COLORS[di % DIST_COLORS.length];
+            const cls = c.class_name ? ` (${c.class_name})` : '';
+            html += `<div class="legend-item legend-toggle" data-ci="${ci}" onclick="toggleCandidate(${ci})"><div class="legend-swatch" style="background:#${col.getHexString()};"></div> #${c.mask_id}${cls}</div>`;
+            di++;
+        }
+    });
+    html += '<div class="legend-title" style="margin-top:8px;">Views (GT)</div>';
+    html += '<div class="legend-item"><div class="legend-swatch" style="background:#2e7d32;"></div> IVS Selected (top-3)</div>';
+    html += '<div class="legend-item"><div class="legend-swatch" style="background:#888;opacity:0.5;"></div> View Pool (scored)</div>';
+    document.getElementById('legend').innerHTML = html;
+}
+
+// ===================== Frame Gallery =====================
+let galleryCandidate = -1;
+let hoverFrustumGroup = null;
+
+let gallerySort = 'ivs';
+window.setGallerySort = function(mode) {
+    gallerySort = mode;
+    document.querySelectorAll('.gsort-btn').forEach(b => b.classList.toggle('active', b.dataset.s === mode));
+    const hint = document.getElementById('galleryHint');
+    hint.textContent = mode === 'vis'
+        ? 'Views ranked by visibility (how much of the candidate is visible). Green border still marks the top-3 views chosen by the IVS selector -- note they are often not the most visible ones.'
+        : "Views of the selected candidate, ranked by the learned view selector's score (bottom-right of each thumbnail). Green border = top-3 views given to the VLM.";
+    if (galleryCandidate >= 0) showGalleryForCandidate(galleryCandidate);
+};
+
+function bindTip(el, text) {
+    el.addEventListener('mouseenter', (e) => {
+        const tip = document.getElementById('tipPop');
+        tip.textContent = text;
+        tip.style.display = 'block';
+        const r = el.getBoundingClientRect();
+        const tw = tip.offsetWidth;
+        tip.style.left = Math.min(Math.max(6, r.left + r.width / 2 - tw / 2), window.innerWidth - tw - 6) + 'px';
+        tip.style.top = Math.max(6, r.top - tip.offsetHeight - 6) + 'px';
+    });
+    el.addEventListener('mouseleave', () => {
+        document.getElementById('tipPop').style.display = 'none';
+    });
+}
+
+function updateGallery() {
+    if (!currentQuery) {
+        document.getElementById('galleryTabs').innerHTML = '';
+        document.getElementById('galleryGrid').innerHTML = '<div class="gallery-empty">Select a query</div>';
+        return;
+    }
+
+    const tabs = document.getElementById('galleryTabs');
+    tabs.innerHTML = '';
+    let di = 0;
+    currentQuery.candidates.forEach((cand, ci) => {
+        const tab = document.createElement('div');
+        tab.className = 'gallery-tab';
+        const color = cand.is_gt ? '#2e7d32' : '#' + DIST_COLORS[di % DIST_COLORS.length].getHexString();
+        if (!cand.is_gt) di++;
+        tab.style.color = color;
+        tab.textContent = cand.is_gt
+            ? `#${cand.mask_id}${currentQuery.gt_class ? ' ' + currentQuery.gt_class : ''} (GT)`
+            : `#${cand.mask_id}${cand.class_name ? ' ' + cand.class_name : ''}`;
+        tab.dataset.ci = ci;
+        tab.addEventListener('click', () => showGalleryForCandidate(ci));
+        tabs.appendChild(tab);
+    });
+
+    const gtIdx = currentQuery.candidates.findIndex(c => c.is_gt);
+    showGalleryForCandidate(gtIdx >= 0 ? gtIdx : 0);
+}
+
+function showGalleryForCandidate(ci) {
+    galleryCandidate = ci;
+    document.querySelectorAll('.gallery-tab').forEach(t => t.classList.toggle('active', +t.dataset.ci === ci));
+
+    const cand = currentQuery.candidates[ci];
+    if (!cand || !cand.frame_scores) {
+        document.getElementById('galleryGrid').innerHTML = '<div style="padding:8px;font-size:11px;color:#999;">No frames</div>';
+        return;
+    }
+
+    const ivsSorted = Object.entries(cand.frame_scores).sort((a, b) => b[1] - a[1]);
+    const top3Set = new Set(ivsSorted.slice(0, 3).map(([f]) => f));
+    const hasVis = cand.frame_visibility && Object.keys(cand.frame_visibility).length > 0;
+    document.getElementById('gallerySort').style.display = hasVis ? '' : 'none';
+    const sorted = (gallerySort === 'vis' && hasVis)
+        ? Object.entries(cand.frame_visibility).sort((a, b) => b[1] - a[1]).slice(0, 20)
+        : ivsSorted;
+    const sceneId = sceneData.scene_id;
+    const bboxes = cand.frame_bboxes || {};
+
+    // Compute candidate color (must match tab/frustum color assignment)
+    let di = 0;
+    for (let i = 0; i < ci; i++) { if (!currentQuery.candidates[i].is_gt) di++; }
+    const candColor = cand.is_gt ? '#2e7d32' : '#' + DIST_COLORS[di % DIST_COLORS.length].getHexString();
+
+    const grid = document.getElementById('galleryGrid');
+    grid.innerHTML = '';
+
+    sorted.forEach(([fid, score], rank) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item' + (top3Set.has(fid) ? ' top3' : '');
+        item.dataset.fid = fid;
+        item.dataset.rank = rank;
+        item.dataset.score = score.toFixed(4);
+
+        const img = document.createElement('img');
+        img.src = `data/frames/${sceneId}/${fid}.jpg`;
+        img.alt = `Frame ${fid}`;
+        img.loading = 'lazy';
+        item.appendChild(img);
+
+        // 2D bbox overlay
+        const bb = bboxes[fid];
+        if (bb) {
+            const overlay = document.createElement('div');
+            overlay.className = 'bbox-overlay';
+            overlay.style.left = (bb[0] * 100) + '%';
+            overlay.style.top = (bb[1] * 100) + '%';
+            overlay.style.width = ((bb[2] - bb[0]) * 100) + '%';
+            overlay.style.height = ((bb[3] - bb[1]) * 100) + '%';
+            overlay.style.borderColor = candColor;
+            item.appendChild(overlay);
+        }
+
+        const rankLabel = document.createElement('div');
+        rankLabel.className = 'frame-rank';
+        rankLabel.textContent = `#${rank + 1}`;
+        bindTip(rankLabel, gallerySort === 'vis' ? 'Rank by visibility score' : 'Rank by view-selector score');
+        item.appendChild(rankLabel);
+
+        const fidLabel = document.createElement('div');
+        fidLabel.className = 'frame-id';
+        fidLabel.textContent = `f${fid}`;
+        bindTip(fidLabel, 'Frame ID');
+        item.appendChild(fidLabel);
+
+        const scoreLabel = document.createElement('div');
+        scoreLabel.className = 'frame-score';
+        scoreLabel.textContent = score.toFixed(3);
+        const ivsVal = cand.frame_scores[fid];
+        const visVal = (cand.frame_visibility || {})[fid];
+        bindTip(scoreLabel,
+            (gallerySort === 'vis'
+                ? 'Visibility score: how much of the candidate is visible in this view'
+                : 'View-selector score: how informative this view is for grounding the candidate')
+            + ' | IVS: ' + (ivsVal !== undefined ? ivsVal.toFixed(3) : 'not in top-20')
+            + ' | Visibility: ' + (visVal !== undefined ? visVal.toFixed(3) : 'n/a'));
+        item.appendChild(scoreLabel);
+
+        item.addEventListener('mouseenter', () => highlightFrustum(fid));
+        item.addEventListener('mouseleave', () => unhighlightFrustum());
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openLightbox(sceneId, fid, rank, score, top3Set.has(fid), bboxes[fid], candColor);
+        });
+
+        grid.appendChild(item);
+    });
+}
+
+// --- Lightbox ---
+window.openLightbox = function(sceneId, fid, rank, score, isTop3, bb, color) {
+    const lb = document.getElementById('lightbox');
+    const wrap = document.getElementById('lightboxWrap');
+    const img = document.getElementById('lightboxImg');
+    const info = document.getElementById('lightboxInfo');
+    // Remove old bbox overlays
+    wrap.querySelectorAll('.bbox-overlay').forEach(el => el.remove());
+    // Hide image while loading to avoid flash of previous image
+    img.style.opacity = '0';
+    img.src = `data/frames_hires/${sceneId}/${fid}.jpg`;
+    img.onload = () => {
+        img.style.opacity = '1';
+        // Draw 2D bbox after image loads (so wrap has correct dimensions)
+        if (bb && color) {
+            const overlay = document.createElement('div');
+            overlay.className = 'bbox-overlay';
+            overlay.style.left = (bb[0] * 100) + '%';
+            overlay.style.top = (bb[1] * 100) + '%';
+            overlay.style.width = ((bb[2] - bb[0]) * 100) + '%';
+            overlay.style.height = ((bb[3] - bb[1]) * 100) + '%';
+            overlay.style.borderColor = color;
+            wrap.appendChild(overlay);
+        }
+    };
+    const top3Tag = isTop3 ? ' <span style="color:#66bb6a;font-weight:700;">IVS Selected</span>' : '';
+    info.innerHTML = `Frame <b>${fid}</b> &nbsp; <span class="lb-rank">Rank #${rank + 1}</span> &nbsp; <span class="lb-score">Score: ${score.toFixed(4)}</span>${top3Tag}`;
+    lb.classList.add('visible');
+    // Also show frustum in 3D
+    highlightFrustum(fid);
+};
+
+window.closeLightbox = function() {
+    document.getElementById('lightbox').classList.remove('visible');
+    unhighlightFrustum();
+};
+
+// Close on Escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeLightbox();
+});
+
+// --- Frustum highlight (gallery -> 3D) ---
+function highlightFrustum(fid) {
+    unhighlightFrustum();
+    const pose = sceneData.poses[fid];
+    if (!pose) return;
+
+    hoverFrustumGroup = new THREE.Group();
+    const { edgePos, fillVerts } = computeFrustumParts(pose, 0.45);
+    const container = document.getElementById('viewer');
+    const geo = new LineSegmentsGeometry();
+    geo.setPositions(edgePos);
+    hoverFrustumGroup.add(new LineSegments2(geo, new LineMaterial({
+        color: 0xffff00, linewidth: 4,
+        resolution: new THREE.Vector2(container.clientWidth, container.clientHeight),
+        transparent: true, opacity: 1.0,
+    })));
+    if (fillVerts.length) {
+        const fg = new THREE.BufferGeometry();
+        fg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(fillVerts), 3));
+        hoverFrustumGroup.add(new THREE.Mesh(fg, new THREE.MeshBasicMaterial({
+            color: 0xffff00, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false,
+        })));
+    }
+    // View rays: extend from camera through frustum corners
+    const rayDepth = 3.0;
+    const { edgePos: rayEdge, fillVerts: rayFill } = computeFrustumParts(pose, rayDepth);
+    // Only take the 4 camera-to-corner edges (first 4 segments = 24 floats)
+    const rayLines = rayEdge.slice(0, 24);
+    const rGeo = new LineSegmentsGeometry();
+    rGeo.setPositions(rayLines);
+    hoverFrustumGroup.add(new LineSegments2(rGeo, new LineMaterial({
+        color: 0xffff00, linewidth: 1.5,
+        resolution: new THREE.Vector2(container.clientWidth, container.clientHeight),
+        transparent: true, opacity: 0.3,
+    })));
+    // Translucent cone fill at extended depth
+    if (rayFill.length) {
+        const rfg = new THREE.BufferGeometry();
+        rfg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(rayFill), 3));
+        hoverFrustumGroup.add(new THREE.Mesh(rfg, new THREE.MeshBasicMaterial({
+            color: 0xffff00, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false,
+        })));
+    }
+    scene3d.add(hoverFrustumGroup);
+
+    document.querySelectorAll('.gallery-item').forEach(el => {
+        el.classList.toggle('highlighted', el.dataset.fid === fid);
+    });
+}
+
+function unhighlightFrustum() {
+    if (hoverFrustumGroup) {
+        hoverFrustumGroup.children.forEach(ch => { ch.geometry?.dispose(); ch.material?.dispose(); });
+        scene3d.remove(hoverFrustumGroup);
+        hoverFrustumGroup = null;
+    }
+    document.querySelectorAll('.gallery-item.highlighted').forEach(el => el.classList.remove('highlighted'));
+}
+
+// --- Frustum hit meshes for reverse hover (3D -> gallery) ---
+function buildFrustumHitMeshes() {
+    // Remove old hit meshes
+    frustumHitMeshes.forEach(m => { scene3d.remove(m); m.geometry.dispose(); m.material.dispose(); });
+    frustumHitMeshes = [];
+    if (!currentQuery || !sceneData.poses) return;
+
+    currentQuery.candidates.forEach((cand, ci) => {
+        const scores = cand.frame_scores;
+        if (!scores) return;
+        const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+        // Only build hit meshes for frames that have visible frustums:
+        // GT: all frames, non-GT: top 3 only
+        const visibleFrames = cand.is_gt ? sorted : sorted.slice(0, 3);
+        visibleFrames.forEach(([fid]) => {
+            const p = sceneData.poses[fid];
+            if (!p) return;
+            const { fillVerts } = computeFrustumParts(p, 0.3);
+            if (!fillVerts.length) return;
+            const fg = new THREE.BufferGeometry();
+            fg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(fillVerts), 3));
+            const mesh = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }));
+            mesh.userData.fid = fid;
+            mesh.userData.candIdx = ci;
+            scene3d.add(mesh);
+            frustumHitMeshes.push(mesh);
+        });
+    });
+}
+
+// Reverse hover: mousemove on canvas -> raycast -> highlight gallery
+function onCanvasMouseMove(e) {
+    if (!frustumHitMeshes.length || !showFrustums) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const activeMeshes = frustumHitMeshes.filter(m => !m.userData.disabled);
+    const hits = raycaster.intersectObjects(activeMeshes);
+    const fid = hits.length > 0 ? hits[0].object.userData.fid : null;
+    if (fid === lastHoveredFid) return;
+    lastHoveredFid = fid;
+    if (fid) {
+        highlightFrustum(fid);
+        // Scroll gallery item into view
+        const el = document.querySelector(`.gallery-item[data-fid="${fid}"]`);
+        if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+        unhighlightFrustum();
+    }
+}
+
+function onCanvasMouseLeave() {
+    if (lastHoveredFid) {
+        lastHoveredFid = null;
+        unhighlightFrustum();
+    }
+}
+
+// ===================== Scene Switching =====================
+let allScenes = [];
+
+window.onSceneChange = function(sceneId) {
+    if (sceneId && sceneId !== sceneData?.scene_id) {
+        loadScene(sceneId);
+    }
+};
+
+function populateSceneSelector(scenes, current) {
+    const sel = document.getElementById('sceneSelector');
+    sel.innerHTML = '';
+    scenes.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        if (s === current) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+// ===================== Boot =====================
+init();
+if (window.innerWidth < 900) {
+    document.getElementById('mobileNotice').classList.add('visible');
+}
+
+fetch('data/index.json').then(r => r.json()).then(idx => {
+    allScenes = idx.scenes || [];
+    populateSceneSelector(allScenes, allScenes[0]);
+    if (allScenes.length) {
+        loadScene(allScenes[0]).then(() => {
+            // Preload all other scenes in background after first loads
+            preloadScenes(allScenes.slice(1));
+        });
+    }
+}).catch(() => {
+    document.querySelector('.loading-text').innerHTML =
+        'Demo data is not deployed yet.<br>Please check back soon, or see the project page for the video walkthrough.';
+});
+</script>
+</body>
+</html>

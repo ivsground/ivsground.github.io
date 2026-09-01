@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Primary Meta Tags -->
+  <meta name="title" content="Where to Look Matters: Learning Influential Views for VLM-based 3D Visual Grounding">
+  <meta name="description" content="IVSGround (ECCV 2026) learns Influential View Selection for VLM-based zero-shot 3D visual grounding: a lightweight view selector trained with reasoning-VLM feedback via two-stage rejection sampling.">
+  <meta name="keywords" content="3D visual grounding, view selection, vision-language models, VLM, zero-shot, ScanRefer, Nr3D, ECCV 2026">
+  <meta name="author" content="Tsung-Chih Chiang, Hsuan-Kung Yang, Jou-Min Liu, Ting-Ru Liu, Chun-Wei Huang, Quan Kong, Chun-Yi Lee">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="English">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Where to Look Matters: Learning Influential Views for VLM-based 3D Visual Grounding">
+  <meta property="og:description" content="IVSGround (ECCV 2026) learns Influential View Selection for VLM-based zero-shot 3D visual grounding.">
+  <meta property="og:image" content="static/images/demo_preview.jpg">
+
+  <!-- Academic/Research Specific -->
+  <meta name="citation_title" content="Where to Look Matters: Learning Influential Views for VLM-based 3D Visual Grounding">
+  <meta name="citation_author" content="Chiang, Tsung-Chih">
+  <meta name="citation_author" content="Yang, Hsuan-Kung">
+  <meta name="citation_author" content="Liu, Jou-Min">
+  <meta name="citation_author" content="Liu, Ting-Ru">
+  <meta name="citation_author" content="Huang, Chun-Wei">
+  <meta name="citation_author" content="Kong, Quan">
+  <meta name="citation_author" content="Lee, Chun-Yi">
+  <meta name="citation_publication_date" content="2026">
+  <meta name="citation_conference_title" content="European Conference on Computer Vision (ECCV)">
+
+  <meta name="theme-color" content="#2563eb">
+
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://ajax.googleapis.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+
+  <title>IVSGround: Where to Look Matters - Learning Influential Views for VLM-based 3D Visual Grounding</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="static/images/favicon.svg">
+
+  <!-- Critical CSS - Load synchronously -->
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+
+  <!-- Non-critical CSS - Load asynchronously -->
+  <link rel="preload" href="static/css/bulma-carousel.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="static/css/bulma-slider.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="static/css/fontawesome.all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+    <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+    <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  </noscript>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Defer non-critical JavaScript -->
+  <script defer src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+  <script defer src="static/js/bulma-carousel.min.js"></script>
+  <script defer src="static/js/bulma-slider.min.js"></script>
+  <script defer src="static/js/index.js"></script>
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ScholarlyArticle",
+    "headline": "Where to Look Matters: Learning Influential Views for VLM-based 3D Visual Grounding",
+    "description": "IVSGround learns Influential View Selection for VLM-based zero-shot 3D visual grounding.",
+    "author": [
+      {"@type": "Person", "name": "Tsung-Chih Chiang", "affiliation": {"@type": "Organization", "name": "National Tsing Hua University"}},
+      {"@type": "Person", "name": "Hsuan-Kung Yang", "affiliation": {"@type": "Organization", "name": "Woven by Toyota, Inc."}},
+      {"@type": "Person", "name": "Jou-Min Liu", "affiliation": {"@type": "Organization", "name": "National Tsing Hua University"}},
+      {"@type": "Person", "name": "Ting-Ru Liu", "affiliation": {"@type": "Organization", "name": "National Tsing Hua University"}},
+      {"@type": "Person", "name": "Chun-Wei Huang", "affiliation": {"@type": "Organization", "name": "National Tsing Hua University"}},
+      {"@type": "Person", "name": "Quan Kong", "affiliation": {"@type": "Organization", "name": "Woven by Toyota, Inc."}},
+      {"@type": "Person", "name": "Chun-Yi Lee", "affiliation": {"@type": "Organization", "name": "National Taiwan University"}}
+    ],
+    "datePublished": "2026",
+    "publisher": {"@type": "Organization", "name": "European Conference on Computer Vision (ECCV)"}
+  }
+  </script>
+</head>
+<body>
+
+
+  <!-- Scroll to Top Button -->
+  <button class="scroll-to-top" onclick="scrollToTop()" title="Scroll to top" aria-label="Scroll to top">
+    <i class="fas fa-chevron-up"></i>
+  </button>
+
+  <main id="main-content">
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">Where to Look Matters: Learning Influential Views for VLM-based 3D Visual Grounding</h1>
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><a href="https://github.com/george09270927" target="_blank">Tsung-Chih Chiang</a><sup>1*</sup>,</span>
+              <span class="author-block"><a href="https://hsuan-kung.xyz/" target="_blank">Hsuan-Kung Yang</a><sup>2*</sup>,</span>
+              <span class="author-block"><a href="https://github.com/romiromi" target="_blank">Jou-Min Liu</a><sup>1&dagger;</sup>,</span>
+              <span class="author-block"><a href="https://github.com/tingru0203" target="_blank">Ting-Ru Liu</a><sup>1&dagger;</sup>,</span>
+              <span class="author-block"><a href="https://github.com/tangerine1202" target="_blank">Chun-Wei Huang</a><sup>1&dagger;</sup>,</span>
+              <span class="author-block"><a href="https://fusionk.github.io/quankong/" target="_blank">Quan Kong</a><sup>2</sup>,</span>
+              <span class="author-block"><a href="https://www.csie.ntu.edu.tw/zh_tw/member/Faculty/%E6%9D%8E%E6%BF%AC%E5%B1%B9-Chun-Yi-Lee-67240464" target="_blank">Chun-Yi Lee</a><sup>3&#9993;</sup></span>
+            </div>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>National Tsing Hua University &nbsp;
+                <sup>2</sup>Woven by Toyota, Inc. &nbsp;
+                <sup>3</sup>National Taiwan University<br>ECCV 2026</span>
+              <span class="eql-cntrb"><small><br><sup>*</sup>Co-first authors &nbsp;
+                <sup>&dagger;</sup>Equal contribution &nbsp;
+                <sup>&#9993;</sup>Corresponding author</small></span>
+            </div>
+
+            <div class="lab-line">
+              <a href="https://elsalab.ai/" target="_blank" class="lab-link">
+                <img src="static/images/elsa_lab.png" alt="ELSA Lab logo">
+                <span>ELSA Lab</span>
+              </a>
+            </div>
+
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <!-- TODO: fill in the real Paper (Springer/PDF) and arXiv URLs -->
+                <span class="link-block">
+                  <a class="external-link button is-normal is-rounded is-dark coming-soon" title="Coming soon">
+                    <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                    <span>Paper</span>
+                  </a>
+                </span>
+
+                <span class="link-block">
+                  <a class="external-link button is-normal is-rounded is-dark coming-soon" title="Coming soon">
+                    <span class="icon"><i class="ai ai-arxiv"></i></span>
+                    <span>arXiv</span>
+                  </a>
+                </span>
+
+                <span class="link-block">
+                  <a href="#video" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fas fa-video"></i></span>
+                    <span>Video</span>
+                  </a>
+                </span>
+
+                <span class="link-block">
+                  <a href="demo/" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fas fa-cube"></i></span>
+                    <span>Interactive Demo</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<!-- Teaser figure -->
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <img src="static/images/overview.jpg" alt="Overview of the IVSGround pipeline" style="width:100%;height:auto;">
+      <h2 class="subtitle has-text-centered">
+        <b>IVSGround</b> learns <i>where to look</i>: a lightweight view selector ranks camera views
+        by their grounding relevance, and a frozen VLM reasons over the selected views to localize
+        the referred object.
+      </h2>
+    </div>
+  </div>
+</section>
+<!-- End teaser figure -->
+
+<!-- Paper abstract -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Recent zero-shot 3D visual grounding methods leverage vision&ndash;language models (VLMs)
+            to localize objects in 3D scenes from natural language queries. However, these methods
+            typically rely on heuristic rules to select which camera views are provided to the VLM,
+            often prioritizing object visibility rather than grounding relevance. We present
+            <b>IVSGround</b>, a framework that learns <i>Influential View Selection</i> for VLM-based
+            3D visual grounding. Instead of using fixed heuristics, a lightweight view selector is
+            trained to identify views that provide discriminative evidence for grounding. To obtain
+            supervision signals, we generate training signals using feedback from a reasoning VLM
+            through a two-stage rejection sampling process. During inference, the learned selector
+            predicts query-conditioned influential views for each candidate object, which are then
+            evaluated by a frozen reasoning VLM through comparative grounding. Experiments on
+            ScanRefer and NR3D show that IVSGround consistently improves grounding accuracy over
+            existing zero-shot pipelines, demonstrating that selecting <i>where to look</i> is
+            crucial for effective 3D visual grounding.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End paper abstract -->
+
+<!-- Method -->
+<section class="section hero">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-full">
+        <h2 class="title is-3">Training Signal via Rejection Sampling</h2>
+        <img src="static/images/rejection-sampling.jpg" alt="Two-stage feedback collection pipeline via rejection sampling" style="width:100%;height:auto;">
+        <div class="content has-text-justified" style="margin-top:16px;">
+          <p>
+            Supervision for the view selector is collected in two stages using feedback from a
+            reasoning VLM: (a) <b>per-view evidence assessment</b> identifies views that provide
+            informative grounding evidence for each candidate, and (b) <b>comparative feedback
+            collection</b> performs pairwise queries with these views to obtain preference
+            supervision between competing candidates. Only views passing both stages form the
+            influential view pool used for training.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End method -->
+
+<!-- Qualitative results -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-full">
+        <h2 class="title is-3">Qualitative View Selection Examples</h2>
+        <img src="static/images/qualitative.jpg" alt="Qualitative view selection examples" style="width:100%;height:auto;">
+        <div class="content has-text-justified" style="margin-top:16px;">
+          <p>
+            Each panel shows a bird&rsquo;s-eye view of the scene with camera frustums for the
+            target (green) and distractor (blue) candidates, along with the top-ranked views
+            selected by the learned view selector. Red boxes indicate the candidate object in each
+            view. The four queries span different reasoning types: spatial proximity (a), landmark
+            association (b), region-based (c), and comparative distance (d).
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End qualitative results -->
+
+<!-- Video presentation -->
+<section class="hero is-small" id="video">
+  <div class="hero-body">
+    <div class="container">
+      <h2 class="title is-3 has-text-centered">Video Presentation</h2>
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <div class="publication-video">
+            <iframe src="https://www.youtube.com/embed/Y0SeX7dCF_w" title="ECCV 2026 presentation video"
+                    frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End video presentation -->
+
+<!-- Interactive demo -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-full">
+        <h2 class="title is-3">Interactive Demo</h2>
+        <div class="content">
+          <p>
+            Explore IVSGround directly in your browser: inspect Nr3D scenes in 3D, browse the
+            camera views ranked by the learned view selector for each candidate object, and
+            compare IVSGround&rsquo;s reasoning against the visibility-based baseline.
+          </p>
+        </div>
+        <a class="demo-preview" href="demo/">
+          <img src="static/images/demo_preview.jpg" alt="Screenshot of the IVSGround interactive demo">
+          <span class="demo-preview-btn"><i class="fas fa-cube"></i>&nbsp; Launch Interactive Demo</span>
+        </a>
+
+        <h3 class="title is-5" style="margin-top:2.75rem;">Demo Walkthrough</h3>
+        <div class="content">
+          <p>Prefer a guided tour? A three-minute walkthrough of the demo:</p>
+        </div>
+        <video controls preload="metadata" playsinline style="width:100%;border-radius:10px;">
+          <source src="static/videos/supplementary_video.mp4" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End interactive demo -->
+
+<!--BibTex citation -->
+  <section class="section" id="BibTeX">
+    <div class="container is-max-desktop content">
+      <div class="bibtex-header">
+        <h2 class="title">BibTeX</h2>
+        <button class="copy-bibtex-btn" onclick="copyBibTeX()" title="Copy BibTeX to clipboard">
+          <i class="fas fa-copy"></i>
+          <span class="copy-text">Copy</span>
+        </button>
+      </div>
+      <!-- TODO: replace with official Springer bibliographic info (DOI, pages) once available -->
+      <pre id="bibtex-code"><code>@inproceedings{chiang2026ivsground,
+  title     = {Where to Look Matters: Learning Influential Views for VLM-based 3D Visual Grounding},
+  author    = {Chiang, Tsung-Chih and Yang, Hsuan-Kung and Liu, Jou-Min and Liu, Ting-Ru and Huang, Chun-Wei and Kong, Quan and Lee, Chun-Yi},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year      = {2026}
+}</code></pre>
+    </div>
+</section>
+<!--End BibTex citation -->
+
+
+  <footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+
+          <p>
+            This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a> which was adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
+            You are free to borrow the source code of this website, we just ask that you link back to this page in the footer. <br> This website is licensed under a <a rel="license"  href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
+            Commons Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+  </main>
+  </body>
+  </html>

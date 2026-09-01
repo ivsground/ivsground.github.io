@@ -1,0 +1,12 @@
+{
+  "scenes": [
+    "scene0221_00",
+    "scene0645_00",
+    "scene0648_00",
+    "scene0565_00",
+    "scene0307_00",
+    "scene0568_00"
+  ],
+  "total_queries": 34,
+  "description": "IVSGround interactive demo data"
+}
