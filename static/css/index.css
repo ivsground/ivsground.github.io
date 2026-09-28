@@ -790,10 +790,3 @@ a:focus {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-
-/* Paper/arXiv buttons kept visible but disabled until links exist */
-.publication-links .coming-soon {
-  opacity: 0.5;
-  cursor: default;
-  pointer-events: none;
-}
